@@ -117,3 +117,19 @@ $app->get('/client/{client_id}', function (Request $request, Response $response,
         return $newResponse->withJson(array("status"=> "failed"));
     }
 });
+
+$app->get('/user/loans', function (Request $request, Response $response, array $args) {
+    $array = array();
+    $loans = ORM::forTable('loans')->limit(200)->orderByDesc('id')->find_result_set();
+    foreach ($loans as $loan) {
+        $temp = $loan->as_array();
+        $loan_history = ORM::forTable('loan_history')->where('loan_id', $loan->id)->limit(200)->orderByDesc('id')->findArray();
+        $loan_transactions = ORM::forTable('loan_transactions')->where('loan_id', $loan->id)->limit(200)->orderByDesc('id')->findArray();
+        $client = ORM::forTable('clients')->where('id', $loan->client_id)->findOne()->as_array();
+        $temp["loan_history"] = $loan_history;
+        $temp["loan_transactions"] = $loan_transactions;
+        $temp["client"]= $client;
+        $array[] = $temp;
+    }
+    return $response->withJson($array);
+});
