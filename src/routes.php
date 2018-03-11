@@ -5,13 +5,13 @@ use Slim\Http\Response;
 
 // Routes
 
-$app->get('/[{name}]', function (Request $request, Response $response, array $args) {
-    // Sample log message
-    $this->logger->info("Slim-Skeleton '/' route");
-
-    // Render index view
-    return $this->renderer->render($response, 'index.phtml', $args);
-});
+//$app->get('/[{name}]', function (Request $request, Response $response, array $args) {
+//    // Sample log message
+//    $this->logger->info("Slim-Skeleton '/' route");
+//
+//    // Render index view
+//    return $this->renderer->render($response, 'index.phtml', $args);
+//});
 
 
 $app->post('/user/auth', function (Request $request, Response $response, array  $args) {
@@ -118,6 +118,16 @@ $app->get('/client/{client_id}', function (Request $request, Response $response,
     }
 });
 
+$app->get('/user/{user_id}/get', function (Request $request, Response $response, array $args) {
+    $client = ORM::forTable('users')->where('id', $args['user_id'])->findOne();
+    if ($client) {
+        return $response->withJson($client->as_array());
+    } else {
+        $newResponse = $response->withStatus(400);
+        return $newResponse->withJson(array("status"=> "failed"));
+    }
+});
+
 $app->get('/user/loans', function (Request $request, Response $response, array $args) {
     $array = array();
     $loans = ORM::forTable('loans')->limit(200)->orderByDesc('id')->find_result_set();
@@ -132,4 +142,67 @@ $app->get('/user/loans', function (Request $request, Response $response, array $
         $array[] = $temp;
     }
     return $response->withJson($array);
+});
+
+$app->get('/support', function (Request $request, Response $response, array $args) {
+    $array = array();
+    $supports = ORM::forTable('support')->orderByAsc('name')->findResultSet();
+    foreach ($supports as $support) {
+        $temp = $support->as_array();
+        $temp['count_tickets'] = ORM::forTable('support_tickets')->where('support_id', $support->id)->count();
+        $array[] = $temp;
+    }
+    return $response->withJson($array);
+});
+
+$app->get('/support/{support_id}/tickets', function (Request $request, Response $response, array $args) {
+    $array = array();
+    $tickets = ORM::forTable('support_tickets')->where('support_id', $args['support_id'])->orderByDesc('id')->findResultSet();
+    foreach ($tickets as $ticket) {
+        $temp = $ticket->as_array();
+        $temp['client'] = ORM::forTable('clients')->where('id', $ticket->client_id)->find_one()->as_array();
+        $array[] = $temp;
+    }
+    return $response->withJson($array);
+});
+
+$app->post('/support/add', function (Request $request, Response $response, array $args) {
+   $support = ORM::forTable('support')->create();
+   $support->name = $request->getParsedBody()['name'];
+   $support->description = $request->getParsedBody()['description'];
+   $support->save();
+    if ($support) {
+        return $response->withJson($support->as_array());
+    } else {
+        $newResponse = $response->withStatus(400);
+        return $newResponse->withJson(array("status"=> "failed"));
+    }
+});
+
+$app->get('/client/{client_id}/support', function (Request $request, Response $response, array $args) {
+    $array = array();
+    $support_tickets = ORM::forTable('support_tickets')->where('client_id',$args['client_id'])->orderByDesc('id')->findResultSet();
+    foreach ($support_tickets as $ticket) {
+        $temp = $ticket->as_array();
+        $temp['count_answers'] = ORM::forTable('support_answers')->where('support_ticket_id', $ticket->id)->count();
+        $support_name = ORM::forTable('support')->select('name')->where('id', $ticket->support_id)->find_one();
+        $temp['support_name'] = $support_name->name;
+        $array[] = $temp;
+    }
+    return $response->withJson($array);
+});
+
+$app->post('/client/{client_id}/support/{support_id}/add', function (Request $request, Response $response, array $args) {
+    $support_ticket = ORM::forTable('support_tickets')->create();
+    $support_ticket->support_id = $args['support_id'];
+    $support_ticket->client_id = $args['client_id'];
+    $support_ticket->text = $request->getParsedBody()['text'];
+    $support_ticket->date_issue = $request->getParsedBody()['date_issue'];
+    $support_ticket->save();
+    if ($support_ticket) {
+        return $response->withJson($support_ticket->as_array());
+    } else {
+        $newResponse = $response->withStatus(400);
+        return $newResponse->withJson(array("status"=> "failed"));
+    }
 });
