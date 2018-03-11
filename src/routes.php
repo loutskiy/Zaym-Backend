@@ -161,6 +161,7 @@ $app->get('/support/{support_id}/tickets', function (Request $request, Response 
     foreach ($tickets as $ticket) {
         $temp = $ticket->as_array();
         $temp['client'] = ORM::forTable('clients')->where('id', $ticket->client_id)->find_one()->as_array();
+        $temp['count_answers'] = ORM::forTable('support_answers')->where('support_ticket_id', $ticket->id)->count();
         $array[] = $temp;
     }
     return $response->withJson($array);
@@ -201,6 +202,68 @@ $app->post('/client/{client_id}/support/{support_id}/add', function (Request $re
     $support_ticket->save();
     if ($support_ticket) {
         return $response->withJson($support_ticket->as_array());
+    } else {
+        $newResponse = $response->withStatus(400);
+        return $newResponse->withJson(array("status"=> "failed"));
+    }
+});
+
+$app->get('/support/ticket/{ticket_id}', function (Request $request, Response $response, array $args) {
+    $array = array();
+    $support_tickets = ORM::forTable('support_answers')->where('support_ticket_id',$args['ticket_id'])->orderByDesc('id')->findResultSet();
+    foreach ($support_tickets as $ticket) {
+        $temp = $ticket->as_array();
+        $user = ORM::forTable('users')->where('id', $ticket->user_id)->find_one();
+        $temp['user'] = $user->as_array();
+        $array[] = $temp;
+    }
+    return $response->withJson($array);
+});
+
+$app->post('/support/ticket/{ticket_id}/addAnswer', function (Request $request, Response $response, array $args) {
+    $answer = ORM::forTable('support_answers')->create();
+    $answer->support_ticket_id = $args['ticket_id'];
+    $answer->user_id = $request->getParsedBody()['user_id'];
+    $answer->text = $request->getParsedBody()['text'];
+    $answer->date_issue = $request->getParsedBody()['date_issue'];
+    $answer->save();
+    if ($answer) {
+        return $response->withJson($answer->as_array());
+    } else {
+        $newResponse = $response->withStatus(400);
+        return $newResponse->withJson(array("status"=> "failed"));
+    }
+});
+
+$app->delete('/support/ticket/{ticket_id}', function (Request $request, Response $response, array $args) {
+    $answersToTicket = ORM::forTable('support_answers')->whereEqual('support_ticket_id', $args['ticket_id'])->delete_many();
+    $ticket = ORM::forTable('support_tickets')->where('id', $args['ticket_id'])->find_one()->delete();
+    return $response->withJson(array('status' => 'ok'));
+});
+
+$app->delete('/support/ticket/{ticket_id}/answer/{answer_id}', function (Request $request, Response $response, array $args) {
+    $answer = ORM::forTable('support_answers')->where('id', $args['answer_id'])->find_one()->delete();
+    return $response->withJson(array('status' => 'ok'));
+});
+
+$app->post('/user/{user_id}', function (Request $request, Response $response, array $args) {
+    $user = ORM::forTable('users')->where('id', $args['user_id'])->findOne();
+    $user->password = md5($request->getParsedBody()['password']);
+    $user->save();
+    if ($user) {
+        return $response->withJson($user->as_array());
+    } else {
+        $newResponse = $response->withStatus(400);
+        return $newResponse->withJson(array("status"=> "failed"));
+    }
+});
+
+$app->post('/client/{client_id}', function (Request $request, Response $response, array $args) {
+    $client = ORM::forTable('clients')->where('id', $args['client_id'])->findOne();
+    $client->password = md5($request->getParsedBody()['password']);
+    $client->save();
+    if ($client) {
+        return $response->withJson($client->as_array());
     } else {
         $newResponse = $response->withStatus(400);
         return $newResponse->withJson(array("status"=> "failed"));
