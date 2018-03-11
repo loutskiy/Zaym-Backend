@@ -269,3 +269,18 @@ $app->post('/client/{client_id}', function (Request $request, Response $response
         return $newResponse->withJson(array("status"=> "failed"));
     }
 });
+
+$app->post('/loan/{loan_id}/addStatus', function (Request $request, Response $response, array $args) {
+    $history = ORM::forTable('loan_history')->create();
+    $history->loan_id = $args['loan_id'];
+    $history->user_id = $request->getParsedBody()['user_id'];
+    $history->status = $request->getParsedBody()['status'];
+    $history->date = $request->getParsedBody()['date'];
+    $history->save();
+    if ($history) {
+        return $response->withJson($history->as_array());
+    } else {
+        $newResponse = $response->withStatus(400);
+        return $newResponse->withJson(array("status"=> "failed"));
+    }
+});
